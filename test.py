@@ -1,11 +1,11 @@
 
 
-from mcqbot import answer_v1
+from mcqbot import answer
 from strategy_tester import test_accuracy
 
-data_file= 'data/train.csv'
+data_file= 'data/12.csv'
 
-accuracy = test_accuracy(data_file, answer_v1)
+accuracy = test_accuracy(data_file, answer)
 
 print
 print 'ACCURACY: %2.f%%'% (100*accuracy)
