@@ -9,6 +9,8 @@ question;choice1;choice2;...;choiceN;right_answer_index
 ```
 
 
+Only french supported for now
+
 Example:
 
 ```
@@ -29,3 +31,11 @@ detect if positive or negative
 
 positive -> max occurences
 negative -> min occurences
+
+
+# Future improvements
+
+preprocess question:
+- make sure " " aren't first or last character of a word
+- overally complexify the .split to words.
+- extend mapping
