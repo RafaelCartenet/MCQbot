@@ -43,7 +43,7 @@ def is_negative_question(question, lang='fra'):
 
     # Detect negative key words
     for negative_keyword in negative_keywords:
-        if negative_keyword in question.split():
+        if negative_keyword in question:
             print negative_keyword, question
             return True
     return False
