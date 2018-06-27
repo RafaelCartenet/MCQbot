@@ -6,15 +6,12 @@ import unidecode
 from google import google
 import numpy as np
 import time
+import string as str
+from stopwords import frenchstopwords
 
 ################################################################################
 # NLP tools
 ################################################################################
-
-# NLTK
-from nltk.corpus import stopwords
-frenchstopwords= stopwords.words("french")
-frenchstopwords.remove('qui') # qui seems to be missing from french stopwords
 
 def get_n_grams(sequence, n):
     """
@@ -39,7 +36,10 @@ def is_negative_question(question, lang='fra'):
         raise ValueError("other languages that french aren't implemented")
 
     # Define negative key words
-    negative_keywords = ["n'", "ne"]
+    negative_keywords = ["n'"]
+
+    if 'ne' in question.split():
+        return True
 
     # Detect negative key words
     for negative_keyword in negative_keywords:
@@ -64,17 +64,58 @@ def get_string_type(string):
         return "unicode string"
     return "not a string"
 
+def get_grams(string):
+    # First split to words
+    words = string.split()
+    words = [word.lower() for word in words]
+    stopwords = frenchstopwords
+
+    n_words = []
+    for word in words:
+        if "'" in word:
+            n_words += word.split("'")
+            continue
+        n_words.append(word)
+    words = n_words
+
+    # Unigrams
+    unigrams = [word for word in words if word not in stopwords]
+
+    # Bigrams
+    if len(words) > 2:
+        bigrams = [' '.join(bigram) for bigram in get_n_grams(words, 2)]
+        n_bigrams = []
+        for bigram in bigrams:
+            left, right = bigram.split()
+            if (left in stopwords) and (right in stopwords):
+                continue
+            n_bigrams.append(bigram)
+        bigrams = n_bigrams
+    else:
+        bigrams = []
+
+    # Initialize
+    grams = {
+        'unigrams' : unigrams,
+        'bigrams' : bigrams,
+        'complete' : [string.lower()],
+    }
+
+    return grams
+
+
 ################################################################################
 # Pre/Post processing functions
 ################################################################################
 
-def preprocess_question(question, lang='fra'):
+def preprocess_question(question, lang='fra', delete_stopwords=False):
     """
     Preprocess the question before doing the actual research.
     Delete stopwords etc.
     - question: target question
     - lang: language of the question
     """
+
     # Force the question to unicode
     question = to_unicode(question)
 
@@ -97,24 +138,25 @@ def preprocess_question(question, lang='fra'):
     stopwords = frenchstopwords if lang == 'fra' else []
 
     # Delete the stopwords except the ones between " "
-    quote = False
-    new_words = []
-    for word in words:
-        if word == '"':
-            quote = not quote # reverse the boolean
-            new_words.append(word)
-            continue
+    if delete_stopwords:
+        is_quote = False
+        new_words = []
+        for word in words:
+            if word == '"':
+                is_quote = not is_quote # reverse the boolean
+                new_words.append('"')
+                continue
 
-        if quote:
-            new_words.append(word)
-            continue
+            if is_quote:
+                new_words.append(word)
+                continue
 
-        if word.lower() not in stopwords:
-            new_words.append(word)
+            if word.lower() not in stopwords:
+                new_words.append(word)
+        words = new_words
 
     # Concat all words to a single string again and translate to ascii lower
-    question = ' '.join(new_words)
-    question = unicode_to_ascii(question).lower()
+    question = ' '.join(words)
     return question
 
 def preprocess_choice(choice, lang='fra'):
@@ -131,16 +173,14 @@ def preprocess_choice(choice, lang='fra'):
     words = choice.split()
 
     # Get the stopwords
-    if lang == 'fra':
-        stopwords = frenchstopwords
-    else:
-        stopwords = []
+    stopwords = frenchstopwords if lang == 'fra' else []
 
     if words[0].lower() in stopwords:
         del words[0]
 
     # Concat words back to string, transcode to ascii lower
     choice = ' '.join(words)
+    choice = to_unicode(choice)
     choice = unicode_to_ascii(choice).lower()
 
     return choice
@@ -151,7 +191,7 @@ def preprocess_choice(choice, lang='fra'):
 
 def get_content_google(search_text):
     # Single google search
-    print 'looking for:', search_text
+    print '-> Looking for in Google: %s' % (search_text)
     content = google.search(search_text, lang='en', pages=2)
     text= ''
     for page in content:
@@ -160,6 +200,51 @@ def get_content_google(search_text):
     text = text.lower()
     text = unidecode.unidecode(text)
     return text
+
+################################################################################
+# Scoring Methods
+################################################################################
+
+def simple_count(choice, content):
+    """
+    Simple scoring method based on preoprecessed choice occurences
+    """
+    # Apply a preprocessing to the choice
+    choice = preprocess_choice(choice)
+
+    # Compute the score by counting occurences
+    score = content.count(choice)
+    return score
+
+
+def grams_count(choice, content):
+    # Initialize score
+    score = 0
+
+    # Simple preprocessing
+    choice = to_unicode(choice)
+    choice = unicode_to_ascii(choice).lower()
+
+    # Get n-grams as a dict
+    grams = get_grams(choice)
+
+    # Define multipliers for each gram type
+    multipliers = {
+        'unigrams' : 1,
+        'bigrams' : 3,
+        'complete' : 10,
+    }
+
+    # for each gram type
+    for gram_type in grams:
+        # Calculate sub score
+        gram_type_score = 0
+        for gram in grams[gram_type]:
+            gram_type_score += content.count(gram)
+
+        # Multiply it by the multiplier
+        score += multipliers[gram_type]*gram_type_score
+    return score
 
 
 ################################################################################
@@ -173,32 +258,41 @@ def answer(question, choices):
     if the question is negative question.
     - question: question to answer (str/unicode)
     - choices: list of choices (str/unicode)
-    return index: index of the choosen answer, -1 if error
+    return index: index of the choosen answer, -1 if didn't find anything
     """
     # Checking if question is negative or not
     is_negative = is_negative_question(question)
 
     # process the question and choices
     question = preprocess_question(question)
-    choices = [preprocess_choice(choice) for choice in choices]
 
     # Get the text to search from
     content = get_content_google(question)
 
-    # Count occurences
-    counts = []
+    # Compute score for each choice
+    choice_scores = []
     for choice in choices:
-        count = content.count(choice)
-        counts.append(count)
+        # METHOD 1
+        # choice_score = simple_count(choice, content)
 
-    s = float(sum(counts))
+        # METHOD 2
+        choice_score = grams_count(choice, content)
+
+        choice_scores.append(choice_score)
+
+    NOTFOUND = False
+    s = float(sum(choice_scores))
     if s == 0:
-        print 'no word found'
-        return -1
-    for i in range(len(counts)):
-        print "%s.) %s : %.2f (%s fois)"% (i+1, choices[i], counts[i]/s, counts[i])
+        NOTFOUND = True
+        s = 1.
+    print "# |conf |score"
+    for i in range(len(choice_scores)):
+        print "%s.)"% (i+1),
+        print "%s | %s"% (choice_scores[i]/s, choice_scores[i])
 
-    # take decision
+    # Take final decision
+    if NOTFOUND:
+        return -1
     if is_negative:
-        return np.argmin(counts)
-    return np.argmax(counts)
+        return np.argmin(choice_scores)
+    return np.argmax(choice_scores)
