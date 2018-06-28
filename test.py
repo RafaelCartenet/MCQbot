@@ -12,7 +12,7 @@ def bot_test_process():
     test_process(data_file)
 
 def bot_test_accuracy():
-    data_file= 'data/all.csv'
+    data_file= 'data/12.csv'
     accuracy = test_accuracy(data_file, answer)
     print '\nACCURACY: %2.f%%\n'% (100*accuracy)
 
@@ -20,31 +20,51 @@ if __name__ == '__main__':
     # bot_test_process()
     bot_test_accuracy()
 
-
-
-# 68
-# 62
-
-
+# 2018/06/26 - 141 questions
 # GRAMS COUNT NO unicode handling
-# AVERAGE TIME: 1.15s
+# 2 pages search
+# no delete stopwords for question
+# AVERAGE TIME: 1.15s (HOME WIFI)
 # ACCURACY: 74%
 
-
+# 2018/06/26 - 141 questions
 # SIMPLE COUNT unicode handling.
 # 2 pages search
 # no delete stopwords for question
-# AVERAGE TIME: 1.26s
+# AVERAGE TIME: 1.26s (HOME WIFI)
 # ACCURACY: 80%
 
+# 2018/06/27 - 141 questions
 # GRAMS COUNT unicode handling (1 3 10)
 # 2 pages search
 # NO delete stopwords for question
-# AVERAGE TIME: 0.96s
+# AVERAGE TIME: 0.96s (HOME WIFI)
 # ACCURACY: 85%
 
+# 2018/06/27 - 141 questions
 # GRAMS COUNT unicode handling (1 3 10)
 # 2 pages search
 # WITH delete stopwords for question
-# AVERAGE TIME: ?
+# AVERAGE TIME: ? (HOME WIFI)
 # ACCURACY: 85%
+
+# 2018/06/27 - 141 questions
+# GRAMS COUNT unicode handling (1 3 5)
+# 2 pages search
+# NO delete stopwords for question
+# AVERAGE TIME: 1.64s (OFFICE WIFI)
+# ACCURACY: 90%
+
+# 2018/06/27 - 141 questions
+# GRAMS COUNT unicode handling (1 3 10)
+# 2 pages search
+# NO delete stopwords for question
+# AVERAGE TIME: 1.11s (OFFICE WIFI)
+# ACCURACY: 90%
+
+# 2018/06/27 - 141 questions
+# GRAMS COUNT unicode handling (1 3 10)
+# 2 pages search
+# NO delete stopwords for question
+# AVERAGE TIME: 1.63s (DATA)
+# ACCURACY: 88%

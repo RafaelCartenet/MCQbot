@@ -1,13 +1,17 @@
 #!/usr/local/bin/python
 # -*- coding: utf-8 -*-
 
+# Rafael Cartenet. 2018
+
+from google import google
 import unicodedata
 import unidecode
-from google import google
 import numpy as np
 import time
-import string as str
+from nltk.stem.snowball import FrenchStemmer
 from stopwords import frenchstopwords
+import string as str
+
 
 ################################################################################
 # NLP tools
@@ -19,7 +23,6 @@ def get_n_grams(sequence, n):
     - sequence: a list
     - n: the index of n-grams desired.
     """
-    assert type(sequence) is list, 'Should be a list'
     grams = []
     for k in range(len(sequence) - n + 1):
         grams.append([sequence[i] for i in range(k, k + n)])
@@ -35,73 +38,113 @@ def is_negative_question(question, lang='fra'):
     if lang != 'fra':
         raise ValueError("other languages that french aren't implemented")
 
-    # Define negative key words
-    negative_keywords = ["n'"]
+    # Define negative patterns
+    negative_patterns = [" n'", " ne "]
 
-    if 'ne' in question.split():
-        return True
-
-    # Detect negative key words
-    for negative_keyword in negative_keywords:
-        if negative_keyword in question:
-            print negative_keyword, question
+    # Detect negative patterns
+    for negative_pattern in negative_patterns:
+        if negative_pattern in question:
             return True
     return False
 
-def to_unicode(string):
-    if not isinstance(string, unicode):
-        return string.decode('utf-8')
-    return string
+def correct_unknown_chars(string):
+    """
+    - string: unicode string to be corrected
+    """
+    # Create the reverse mapping
+    reverse_mapping = {
+        "'": [u'‘', u'’'], # apostrophes
+        '"': [u'«', u'»', u'‹', u'›', u'“', u'”'] # quotes
+    }
+    # Generate the original mapping by inverting reverse mapping
+    mapping = dict()
+    for key in reverse_mapping:
+        for item in reverse_mapping[key]:
+            mapping[item] = key
 
-def unicode_to_ascii(string):
-    string = unicodedata.normalize('NFD', string).encode('ascii', 'ignore')
-    return string
+    # Replace chars using the mapping
+    string = reduce(lambda x, y: x.replace(y, mapping[y]), mapping, string)
 
-def get_string_type(string):
-    if isinstance(string, str):
-        return "ordinary string"
-    if isinstance(string, unicode):
-        return "unicode string"
-    return "not a string"
+    return string
 
 def get_grams(string):
+    """
+    From a given string, extract the unigrams and the bigrams, postprocess them
+    and return them in a dict structure.
+    Post processing includes incorrect grams deletion, stemming, etc.
+    - string: a string
+    return: grams. Structure containing unigrams, bigrams and complete string.
+    """
     # First split to words
     words = string.split()
     words = [word.lower() for word in words]
     stopwords = frenchstopwords
 
+    # Split string to words, smartly
     n_words = []
     for word in words:
+        # if word contains apostroph, split it to two parts
         if "'" in word:
             n_words += word.split("'")
             continue
+
         n_words.append(word)
     words = n_words
 
-    # Unigrams
+    # UNIGRAMS
     unigrams = [word for word in words if word not in stopwords]
+    # add the stemmed words
+    stemmer = FrenchStemmer()
+    stemmed_unigrams = map(stemmer.stem, unigrams) # get all the stemmed words
+    unigrams += stemmed_unigrams # add them to the unigrams
 
-    # Bigrams
+    # BIGRAMS
+    bigrams = []
     if len(words) > 2:
-        bigrams = [' '.join(bigram) for bigram in get_n_grams(words, 2)]
-        n_bigrams = []
-        for bigram in bigrams:
-            left, right = bigram.split()
+        # get bigrams
+        raw_bigrams = get_n_grams(words, 2)
+
+        # raw_bigrams post processing
+        bigrams = []
+        for bigram in raw_bigrams:
+            left, right = bigram
+
+            # if every word of the bigram is a stopword, we ignore it.
             if (left in stopwords) and (right in stopwords):
                 continue
-            n_bigrams.append(bigram)
-        bigrams = n_bigrams
-    else:
-        bigrams = []
 
-    # Initialize
+            # join the bigram as a single string
+            bigrams.append(' '.join(bigram))
+
+    # Create our grams structure
     grams = {
         'unigrams' : unigrams,
         'bigrams' : bigrams,
         'complete' : [string.lower()],
     }
-
     return grams
+
+
+################################################################################
+# Ascii/Unicode conversions
+################################################################################
+
+def to_unicode(string):
+    """
+    Force bytes string to unicode
+    - string: any string
+    """
+    if not isinstance(string, unicode):
+        return string.decode('utf-8')
+    return string
+
+def unicode_to_ascii(string):
+    """
+    Transform unicode string to ascii string
+    - string: unicode string
+    """
+    string = unicodedata.normalize('NFD', string).encode('ascii', 'ignore')
+    return string
 
 
 ################################################################################
@@ -119,20 +162,11 @@ def preprocess_question(question, lang='fra', delete_stopwords=False):
     # Force the question to unicode
     question = to_unicode(question)
 
+    # Replace unknown unicode characters using a mapping
+    question = correct_unknown_chars(question)
+
     # Split to words
     words = question.split()
-
-    # Replace characters using following mapping
-    mapping = {
-        u'\xc2\xab': '"',
-        u'\xc2\xbb': '"',
-        u'\xab': '"',
-        u'\xbb': '"',
-    }
-    for i, char in enumerate(words):
-        for key in mapping:
-            if char == key:
-                words[i] = mapping[key]
 
     # Get the stopwords
     stopwords = frenchstopwords if lang == 'fra' else []
@@ -182,8 +216,8 @@ def preprocess_choice(choice, lang='fra'):
     choice = ' '.join(words)
     choice = to_unicode(choice)
     choice = unicode_to_ascii(choice).lower()
-
     return choice
+
 
 ################################################################################
 # Online APIs searching (Google/Wikipedia...)
@@ -200,6 +234,7 @@ def get_content_google(search_text):
     text = text.lower()
     text = unidecode.unidecode(text)
     return text
+
 
 ################################################################################
 # Scoring Methods
@@ -227,6 +262,8 @@ def grams_count(choice, content):
 
     # Get n-grams as a dict
     grams = get_grams(choice)
+
+    print grams
 
     # Define multipliers for each gram type
     multipliers = {
@@ -294,5 +331,6 @@ def answer(question, choices):
     if NOTFOUND:
         return -1
     if is_negative:
+        print 'THIS IS A NEGATIVE QUESTION'
         return np.argmin(choice_scores)
     return np.argmax(choice_scores)
