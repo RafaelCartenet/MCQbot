@@ -3,14 +3,12 @@
 
 # Rafael Cartenet. 2018
 
+from stopwords import frenchstopwords
 from google import google
+import numpy as np
 import unicodedata
 import unidecode
-import numpy as np
 import time
-from nltk.stem.snowball import FrenchStemmer
-from stopwords import frenchstopwords
-import string as str
 
 
 ################################################################################
@@ -49,6 +47,8 @@ def is_negative_question(question, lang='fra'):
 
 def correct_unknown_chars(string):
     """
+    Some characters have different possibilities, according to language, such as
+    apostrophes or quotes. We make sure to transcode them to a common value.
     - string: unicode string to be corrected
     """
     # Create the reverse mapping
@@ -56,7 +56,7 @@ def correct_unknown_chars(string):
         "'": [u'‘', u'’'], # apostrophes
         '"': [u'«', u'»', u'‹', u'›', u'“', u'”'] # quotes
     }
-    # Generate the original mapping by inverting reverse mapping
+    # Generate the original mapping by reversing the reverse mapping
     mapping = dict()
     for key in reverse_mapping:
         for item in reverse_mapping[key]:
@@ -64,14 +64,13 @@ def correct_unknown_chars(string):
 
     # Replace chars using the mapping
     string = reduce(lambda x, y: x.replace(y, mapping[y]), mapping, string)
-
     return string
 
 def get_grams(string):
     """
     From a given string, extract the unigrams and the bigrams, postprocess them
     and return them in a dict structure.
-    Post processing includes incorrect grams deletion, stemming, etc.
+    Post processing includes incorrect grams deletion etc.
     - string: a string
     return: grams. Structure containing unigrams, bigrams and complete string.
     """
@@ -93,10 +92,6 @@ def get_grams(string):
 
     # UNIGRAMS
     unigrams = [word for word in words if word not in stopwords]
-    # add the stemmed words
-    stemmer = FrenchStemmer()
-    stemmed_unigrams = map(stemmer.stem, unigrams) # get all the stemmed words
-    unigrams += stemmed_unigrams # add them to the unigrams
 
     # BIGRAMS
     bigrams = []
@@ -151,20 +146,13 @@ def unicode_to_ascii(string):
 # Pre/Post processing functions
 ################################################################################
 
-def preprocess_question(question, lang='fra', delete_stopwords=False):
+def preprocess_question(question, lang='fra', delete_stopwords=True):
     """
     Preprocess the question before doing the actual research.
     Delete stopwords etc.
     - question: target question
     - lang: language of the question
     """
-
-    # Force the question to unicode
-    question = to_unicode(question)
-
-    # Replace unknown unicode characters using a mapping
-    question = correct_unknown_chars(question)
-
     # Split to words
     words = question.split()
 
@@ -224,15 +212,20 @@ def preprocess_choice(choice, lang='fra'):
 ################################################################################
 
 def get_content_google(search_text):
+    """
+    Google research, using google API. Get the first two pages of research,
+    extract the description of the different items as well as the title names.
+    """
     # Single google search
-    print '-> Looking for in Google: %s' % (search_text)
     content = google.search(search_text, lang='en', pages=2)
+
+    # Concat all text together as a single string
     text= ''
     for page in content:
         text+= page.description + page.name
 
-    text = text.lower()
-    text = unidecode.unidecode(text)
+    # Post processing, transcode to ascii lower
+    text = unicode_to_ascii(text).lower()
     return text
 
 
@@ -251,8 +244,15 @@ def simple_count(choice, content):
     score = content.count(choice)
     return score
 
-
 def grams_count(choice, content):
+    """
+    Scoring method based on n-grams. Preprocess the choice, get the unigrams,
+    bigrams of the choice. Count then in the content and compute finale score.
+    Final score is the sum of the occurences multiplied by a factor.
+    score = k1 x occ_unigrams + k2 x occ_bigrams + k3 x occ_complete
+    - choice: string, one possible choice for the answer
+    - content: string, content to search from.
+    """
     # Initialize score
     score = 0
 
@@ -262,8 +262,6 @@ def grams_count(choice, content):
 
     # Get n-grams as a dict
     grams = get_grams(choice)
-
-    print grams
 
     # Define multipliers for each gram type
     multipliers = {
@@ -285,52 +283,87 @@ def grams_count(choice, content):
 
 
 ################################################################################
-# Main Method
+# Main Methods
 ################################################################################
 
-def answer(question, choices):
+def answer_scores(question, choices, method='ngrams_counts'):
     """
-    Answer a Multiple Choice Question (MCQ). Based on Google research, count the
-    occurences of the choices, choose the choice with highest occurences, except
-    if the question is negative question.
+    Estimates score of each choice of a Multiple Choice Question (MCQ).
+    Based on Google research, compute score for each choice based on different
+    methods.
     - question: question to answer (str/unicode)
     - choices: list of choices (str/unicode)
-    return index: index of the choosen answer, -1 if didn't find anything
+    return index: score of each choice, all sum to 1. If nothing was found,
+    returns list of zeros of size len(choices).
     """
+    # Force the question to unicode
+    question = to_unicode(question)
+
+    # Replace unknown unicode characters
+    question = correct_unknown_chars(question)
+
     # Checking if question is negative or not
     is_negative = is_negative_question(question)
 
-    # process the question and choices
+    # Process the question
     question = preprocess_question(question)
 
     # Get the text to search from
     content = get_content_google(question)
 
-    # Compute score for each choice
+    # Compute score for each choice, based on method
     choice_scores = []
     for choice in choices:
-        # METHOD 1
-        # choice_score = simple_count(choice, content)
+        # METHOD 1 (simple counting)
+        if method == 'simple_counts':
+            choice_score = simple_count(choice, content)
+            choice_scores.append(choice_score)
+            continue
 
-        # METHOD 2
-        choice_score = grams_count(choice, content)
+        # METHOD 2 (n-grams weighted counting)
+        if method == 'ngrams_counts':
+            choice_score = grams_count(choice, content)
+            choice_scores.append(choice_score)
+            continue
 
-        choice_scores.append(choice_score)
+        # method is unknown
+        raise ValueError('Unkonwn scoring method for scoring.')
 
-    NOTFOUND = False
-    s = float(sum(choice_scores))
-    if s == 0:
-        NOTFOUND = True
-        s = 1.
-    print "# |conf |score"
-    for i in range(len(choice_scores)):
-        print "%s.)"% (i+1),
-        print "%s | %s"% (choice_scores[i]/s, choice_scores[i])
+    # Sum of all scores
+    sum_ = float(sum(choice_scores))
 
-    # Take final decision
-    if NOTFOUND:
-        return -1
+    # That means nothing was found, we return a list of zeros
+    if sum_ == 0:
+        return choice_scores
+
+    # Revert score if it is negative
     if is_negative:
-        print 'THIS IS A NEGATIVE QUESTION'
-        return np.argmin(choice_scores)
-    return np.argmax(choice_scores)
+        # Invert scores
+        max_score = max(choice_scores)
+        choice_scores = [max_score - score for score in choice_scores]
+        
+        # Update the sum of all scores
+        sum_ = float(sum(choice_scores))
+
+    # Softmax (Divide by sum each element so that sum of list is 1)
+    choice_scores = [choice_score/sum_ for choice_score in choice_scores]
+    return choice_scores
+
+def answer(question, choices):
+    """
+    Based on the scores of each choice, take a decision about which choice to
+    take.
+    - question: question to answer (str/unicode)
+    - choices: list of choices (str/unicode)
+    return index: index of the choosen choice
+    """
+    # Get the score of each choice of the question
+    choice_scores = answer_scores(question, choices)
+
+    # If sum equals = 0 means all score are zeros means we didn't find anything
+    if sum(choice_scores) == 0:
+        return -1
+
+    # Return the index of the highest score
+    index = np.argmax(choice_scores)
+    return index
