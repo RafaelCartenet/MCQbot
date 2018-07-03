@@ -7,7 +7,6 @@ from stopwords import frenchstopwords
 from google import google
 import numpy as np
 import unicodedata
-import unidecode
 import time
 
 
@@ -341,7 +340,7 @@ def answer_scores(question, choices, method='ngrams_counts'):
         # Invert scores
         max_score = max(choice_scores)
         choice_scores = [max_score - score for score in choice_scores]
-        
+
         # Update the sum of all scores
         sum_ = float(sum(choice_scores))
 
