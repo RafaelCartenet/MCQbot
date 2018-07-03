@@ -61,12 +61,12 @@ Rather that counting in the google search result the entire choice string (prepr
 The score is thus the sum of these sub scores, each sub score having a multiplier:
 
 ```
-total_score = 1*(1-grams occurences) + 3*(2-grams occurences) + 10*(full string)
+total_score = 1*(1-grams occurences) + 3*(2-grams occurences) + 10*(full string occurences)
 ```
 
 In that way, if only one word of the choice occurs, it only adds 1 point to the total score, if a 2-gram is found is found, adds 3 points, and if the full string is found, it adds 10 points.
 
-For example, it is relevant to take in consideration the word **Washington** by itself as **George Washington** can he can be called M. Washington, or President Washington etc. But of course, if both words **George** and **Washington** are found side by side it should adds more points.
+For example, it is relevant to take in consideration the word **Washington** by itself as **George Washington** can be described as M. Washington, or President Washington etc. But of course, if both words **George** and **Washington** are found side by side it should adds more points.
 
 ---
 
@@ -88,22 +88,6 @@ Who was the really first president of the United States ?;Abraham Lincoln;Benjam
 Data can be found in the **data/** subdir, that contains only for know a little french dataset that I have been using.
 **Feel free to use it, improve it, or create new ones and share them.**
 
-## Installation
-
-This project has been developped in python **2.7**, the good ol' verision.
-Requirements can be found in the file requirements.txt, install them with pip:
-```
-pip install -r requirements.txt
-```
-
-Requirements are:
-```
-nltk==3.2.1
-numpy==1.11.1
-protobuf==3.6.0
-Google-Search-API==1.1.13
-```
-
 ## Results
 
 I added a simple function call **test_accuracy**, that you can find in **strategy_tester.py** in order to test a MCQ bot strategy.
@@ -124,7 +108,6 @@ if __name__ == '__main__':
     bot_test_accuracy()
 ```
 
-
 **(2018/07/02)** My accuracy with current best strategy:
 
 ```
@@ -132,9 +115,25 @@ ACCURACY: 88%
 AVERAGE TIME: 1.52s
 ```
 
-Interestingly enough, as results depend on google searchs, and that the latter is
+Interestingly enough, as results depend on google search, and that the latter is
 depending on a bunch of stuff including the cookies and everything, accuracy varies regarding the place you are (the wifi or data provider you are using),
 the time of the day etc. It is thus pretty tough to agree on a single value for accuracy.
+
+## Installation
+
+This project has been developped in python **2.7**, the good ol' version.
+Requirements can be found in the file requirements.txt, install them with pip:
+```
+pip install -r requirements.txt
+```
+
+Requirements are:
+```
+nltk==3.2.1
+numpy==1.11.1
+protobuf==3.6.0
+Google-Search-API==1.1.13
+```
 
 ## Potential improvements
 
