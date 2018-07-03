@@ -114,7 +114,7 @@ def get_grams(string):
     grams = {
         'unigrams' : unigrams,
         'bigrams' : bigrams,
-        'complete' : [string.lower()],
+        'complete' : [preprocess_choice(string)],
     }
     return grams
 

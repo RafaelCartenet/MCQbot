@@ -6,7 +6,7 @@ MCQs are questions where the answer is one of the given choices with the questio
 For example:
 
 ```
-Who was the really first president of the United States ?
+Who was the first president of the United States of America ?
 1.) Abraham Lincoln
 2.) Benjamin Franklin
 3.) George Washington
@@ -33,27 +33,48 @@ from google import google
 my_search = google.search('winner world cup 2018')
 ```
 
-After cleaning that text extracted from the search, scoring happens.
+
+
+After cleaning the text extracted from the search, I concat all the text together as one really long string that represents all the text available on first pages of wikipedia. Now it's time for scoring.
 
 I introduced here the two methods I tried.
- several scoring methods.
 
 ### Method 1
 
-Hello
+First method is super simple method. I delete the first word of the choice if it's a **stopword**, stopwords are words usually filtered out before or after processing of natural language, such as `the`, `a`, `that` etc.
+Then I simply count the number of times I find the choice in the long string, just like you would do it when you Ctrl F on a google search, as shown below:
+
+![](googlesearch.png)
+
+The chosen score is thus the score with highest count
 
 ### Method 2
 
-For example, if the choice is 'Dr Fuentes', anytime we encounter 'Fuentes' it is related to that same person. Indeed, we might also encounter 'Eufemiano Fuentes' (its full name) or 'Doctor Fuentes', 'M. Fuentes'.
+Second method is a bit smarter, it is using n-grams. As a reminder, if the sentence is 'My name is Bob', then,
+```py
+1-grams = ["My", "name", "is", "Bob"]
+2-grams = ["My name", "name is", "is Bob"]
+etc.
+```
+
+Rather that counting in the google search result the entire choice string (preprocessed), we look for the 1-grams, 2-grams and the full string (preprocessed as method 1).
+The score is thus the sum of these sub scores, each sub score having a multiplier:
+
+```
+total_score = 1*(1-grams occurences) + 3*(2-grams occurences) + 10*(full string)
+```
+
+In that way, if only one word of the choice occurs, it only adds 1 point to the total score, if a 2-gram is found is found, adds 3 points, and if the full string is found, it adds 10 points.
+
+For example, it is relevant to take in consideration the word **Washington** by itself as **George Washington** can he can be called M. Washington, or President Washington etc. But of course, if both words **George** and **Washington** are found side by side it should adds more points.
 
 ---
 
 Method 2 gave me better results, as it is really good when the choice is composed of several words.
 
-
 ## Data
 
-I created a simple dataset, that contains for now only french samples. The format is pretty simple:
+I created a simple dataset, that contains for now only french samples. The format is pretty simple, each line is:
 
 ```
 question;choice1;choice2;...;choiceN;right_answer_index
@@ -64,7 +85,7 @@ That means for the above example we would have:
 Who was the really first president of the United States ?;Abraham Lincoln;Benjamin Franklin;George Washington;3
 ```
 
-Data can be found in the data subfile, that contains only for know a little french dataset that I have been using.
+Data can be found in the **data/** subdir, that contains only for know a little french dataset that I have been using.
 **Feel free to use it, improve it, or create new ones and share them.**
 
 ## Installation
@@ -75,10 +96,13 @@ Requirements can be found in the file requirements.txt, install them with pip:
 pip install -r requirements.txt
 ```
 
+Requirements are:
+```
 nltk==3.2.1
 numpy==1.11.1
 protobuf==3.6.0
 Google-Search-API==1.1.13
+```
 
 ## Results
 
