@@ -66,15 +66,16 @@ total_score = 1*(1-grams occurences) + 3*(2-grams occurences) + 10*(full string 
 
 In that way, if only one word of the choice occurs, it only adds 1 point to the total score, if a 2-gram is found is found, adds 3 points, and if the full string is found, it adds 10 points.
 
-For example, it is relevant to take in consideration the word **Washington** by itself as **George Washington** can be described as M. Washington, or President Washington etc. But of course, if both words **George** and **Washington** are found side by side it should adds more points.
+For example, it is relevant to take in consideration the word **Washington** by itself as **George Washington** can be described as M. Washington, or President Washington etc. But of course, if both words **George** and **Washington** are found side by side it should add up more points.
 
 ---
 
-Method 2 gave me better results, as it is really good when the choice is composed of several words.
+Method 2 gave me better results, as it is really good when the choice is not a single word, which actually really often happens.
 
 ## Data
 
-I created a simple dataset, that contains for now only french samples. The format is pretty simple, each line is:
+In order to create a reusable dataset in case people wanna try their own methods, I created a simple dataset, that contains questions, associated choices, and the index of the right choice.
+I came up with a really simple format, each line is:
 
 ```
 question;choice1;choice2;...;choiceN;right_answer_index
@@ -82,10 +83,10 @@ question;choice1;choice2;...;choiceN;right_answer_index
 
 That means for the above example we would have:
 ```
-Who was the really first president of the United States ?;Abraham Lincoln;Benjamin Franklin;George Washington;3
+Who was the first president of the United States of America ?;Abraham Lincoln;Benjamin Franklin;George Washington;3
 ```
 
-Data can be found in the **data/** subdir, that contains only for know a little french dataset that I have been using.
+Data can be found in the **data/** subdir, that contains only for now a little french dataset that I have been using.
 **Feel free to use it, improve it, or create new ones and share them.**
 
 ## Results
